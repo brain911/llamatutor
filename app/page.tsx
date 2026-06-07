@@ -102,7 +102,7 @@ export default function Home() {
       method: "POST",
       body: JSON.stringify({ question }),
     });
-    let sources;
+    let sources = [];
     if (sourcesResponse.ok) {
       sources = await sourcesResponse.json();
 

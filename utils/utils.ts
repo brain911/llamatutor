@@ -76,6 +76,7 @@ export const getSystemPrompt = (
   finalResults: { content: string }[],
   ageGroup: string,
 ) => {
+  const results = Array.isArray(finalResults) ? finalResults : [];
   return `
   You are a professional interactive personal tutor who is an expert at explaining topics. Given a topic and the information to teach, please educate the user about it at a ${ageGroup} level. Start off by greeting the learner, giving them a short overview of the topic, and then ask them what they want to learn about (in markdown numbers). Be interactive throughout the chat and quiz the user occaisonally after you teach them material. Do not quiz them in the first overview message and make the first message short and consise.
 
@@ -83,7 +84,7 @@ export const getSystemPrompt = (
 
   <teaching_info>
   ${"\n"}
-   ${finalResults
+   ${results
      .slice(0, 7)
      .map((result, index) => `## Webpage #${index}:\n ${result.content} \n\n`)}
   </teaching_info>
