@@ -22,7 +22,7 @@ export default function Chat({
   setMessages: React.Dispatch<
     React.SetStateAction<{ role: string; content: string }[]>
   >;
-  handleChat: () => void;
+  handleChat: (messages?: { role: string; content: string }[]) => void;
   topic: string;
 }) {
   const messagesEndRef = useRef<HTMLDivElement>(null);

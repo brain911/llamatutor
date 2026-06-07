@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
       }),
     });
   } catch (e) {
+    console.error("[v0] Chat error:", e);
     return new Response("Error. Answer stream failed.", { status: 202 });
   }
 }

@@ -5,11 +5,6 @@ import Header from "@/components/Header";
 import Hero from "@/components/Hero";
 import Sources from "@/components/Sources";
 import { useState } from "react";
-import {
-  createParser,
-  ParsedEvent,
-  ReconnectInterval,
-} from "eventsource-parser";
 import { getSystemPrompt } from "@/utils/utils";
 import Chat from "@/components/Chat";
 
@@ -36,14 +31,14 @@ export default function Home() {
     setLoading(false);
   };
 
-  const handleChat = async (messages?: { role: string; content: string }[]) => {
+  const handleChat = async (messagesToSend?: { role: string; content: string }[]) => {
     setLoading(true);
     const chatRes = await fetch("/api/getChat", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ messages }),
+      body: JSON.stringify({ messages: messagesToSend || messages }),
     });
 
     if (!chatRes.ok) {
@@ -53,46 +48,51 @@ export default function Home() {
     // This data is a ReadableStream
     const data = chatRes.body;
     if (!data) {
+      setLoading(false);
       return;
     }
-    let fullAnswer = "";
 
-    const onParse = (event: ParsedEvent | ReconnectInterval) => {
-      if (event.type === "event") {
-        const data = event.data;
-        try {
-          const text = JSON.parse(data).text ?? "";
-          fullAnswer += text;
-          // Update messages with each chunk
-          setMessages((prev) => {
-            const lastMessage = prev[prev.length - 1];
-            if (lastMessage.role === "assistant") {
-              return [
-                ...prev.slice(0, -1),
-                { ...lastMessage, content: lastMessage.content + text },
-              ];
-            } else {
-              return [...prev, { role: "assistant", content: text }];
-            }
-          });
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    };
-
-    // https://web.dev/streams/#the-getreader-and-read-methods
     const reader = data.getReader();
     const decoder = new TextDecoder();
-    const parser = createParser(onParse);
-    let done = false;
+    let fullAnswer = "";
 
-    while (!done) {
-      const { value, done: doneReading } = await reader.read();
-      done = doneReading;
-      const chunkValue = decoder.decode(value);
-      parser.feed(chunkValue);
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split("\n");
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.type === "text-delta") {
+                fullAnswer += data.text;
+                // Update messages with each chunk
+                setMessages((prev) => {
+                  const lastMessage = prev[prev.length - 1];
+                  if (lastMessage?.role === "assistant") {
+                    return [
+                      ...prev.slice(0, -1),
+                      { ...lastMessage, content: fullAnswer },
+                    ];
+                  } else {
+                    return [...prev, { role: "assistant", content: fullAnswer }];
+                  }
+                });
+              }
+            } catch (e) {
+              // Skip parse errors
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Stream error:", e);
     }
+
     setLoading(false);
   };
 
@@ -105,7 +105,6 @@ export default function Home() {
     let sources;
     if (sourcesResponse.ok) {
       sources = await sourcesResponse.json();
-
       setSources(sources);
     } else {
       setSources([]);
