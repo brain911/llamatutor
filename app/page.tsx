@@ -12,7 +12,7 @@ export default function Home() {
   const [inputValue, setInputValue] = useState("");
   const [topic, setTopic] = useState("");
   const [showResult, setShowResult] = useState(false);
-  const [sources, setSources] = useState<{ name: string; url: string }[]>([]);
+  const [sources, setSources] = useState<{ name: string; url: string; content: string }[]>([]);
   const [isLoadingSources, setIsLoadingSources] = useState(false);
   const [messages, setMessages] = useState<{ role: string; content: string }[]>(
     [],
