@@ -1,8 +1,6 @@
-import ReactMarkdown from "react-markdown";
 import FinalInputArea from "./FinalInputArea";
+import RichMessage from "./RichMessage";
 import { useEffect, useRef, useState } from "react";
-import simpleLogo from "../public/simple-logo.png";
-import Image from "next/image";
 
 export default function Chat({
   messages,
@@ -28,16 +26,43 @@ export default function Chat({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollableContainerRef = useRef<HTMLDivElement>(null);
   const [didScrollToBottom, setDidScrollToBottom] = useState(true);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   function scrollToBottom() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }
+
+  const handleMessageUpdate = (messageIndex: number, newContent: string) => {
+    const updatedMessages = [...messages];
+    updatedMessages[messageIndex] = {
+      ...updatedMessages[messageIndex],
+      content: newContent,
+    };
+    setMessages(updatedMessages);
+    setEditingIndex(null);
+  };
+
+  const handleFollowUpSuggestion = (suggestion: string) => {
+    setPromptValue(suggestion);
+  };
 
   useEffect(() => {
     if (loading || didScrollToBottom) {
       scrollToBottom();
     }
   }, [didScrollToBottom, messages, loading]);
+
+  useEffect(() => {
+    const handleSuggestion = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      handleFollowUpSuggestion(customEvent.detail);
+    };
+
+    window.addEventListener("suggestion-selected", handleSuggestion);
+    return () => {
+      window.removeEventListener("suggestion-selected", handleSuggestion);
+    };
+  }, []);
 
   useEffect(() => {
     let el = scrollableContainerRef.current;
@@ -72,28 +97,22 @@ export default function Chat({
           className="mt-2 overflow-y-scroll rounded-lg border border-solid border-[#C2C2C2] bg-white px-5 lg:p-7"
         >
           {messages.length > 2 ? (
-            <div className="prose-sm max-w-5xl lg:prose lg:max-w-full">
-              {messages.slice(2).map((message, index) =>
-                message.role === "assistant" ? (
-                  <div className="relative w-full" key={index}>
-                    <Image
-                      src={simpleLogo}
-                      alt=""
-                      className="absolute left-0 top-0 !my-0 size-7"
-                    />
-                    <ReactMarkdown className="w-full pl-10">
-                      {message.content}
-                    </ReactMarkdown>
-                  </div>
-                ) : (
-                  <p
-                    key={index}
-                    className="ml-auto w-fit rounded-xl bg-blue-500 p-4 font-medium text-white"
-                  >
-                    {message.content}
-                  </p>
-                ),
-              )}
+            <div className="space-y-4">
+              {messages.slice(2).map((message, displayIndex) => {
+                const actualIndex = displayIndex + 2;
+                return (
+                  <RichMessage
+                    key={actualIndex}
+                    role={message.role as "user" | "assistant"}
+                    content={message.content}
+                    isEditing={editingIndex === actualIndex}
+                    onEdit={() => setEditingIndex(actualIndex)}
+                    onCancelEdit={() => setEditingIndex(null)}
+                    onMessageUpdate={handleMessageUpdate}
+                    messageIndex={actualIndex}
+                  />
+                );
+              })}
               <div ref={messagesEndRef} />
             </div>
           ) : (
