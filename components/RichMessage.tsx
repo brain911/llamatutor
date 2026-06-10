@@ -4,6 +4,40 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import Image from "next/image";
 import simpleLogo from "../public/simple-logo.png";
+import { Copy, Download, CheckCircle2 } from "lucide-react";
+import GenerativeUI, { type GenerativeUIElement } from "./GenerativeUI";
+
+// Map language codes to file extensions
+const languageToExtension: Record<string, string> = {
+  javascript: "js",
+  typescript: "ts",
+  python: "py",
+  java: "java",
+  cpp: "cpp",
+  csharp: "cs",
+  php: "php",
+  ruby: "rb",
+  go: "go",
+  rust: "rs",
+  swift: "swift",
+  kotlin: "kt",
+  html: "html",
+  css: "css",
+  scss: "scss",
+  less: "less",
+  sql: "sql",
+  json: "json",
+  xml: "xml",
+  yaml: "yaml",
+  bash: "sh",
+  shell: "sh",
+  zsh: "zsh",
+  fish: "fish",
+  powershell: "ps1",
+  markdown: "md",
+  text: "txt",
+  plain: "txt",
+};
 
 interface MessageSource {
   name: string;
@@ -16,6 +50,7 @@ interface RichMessageProps {
   reasoning?: string;
   sources?: MessageSource[];
   followUpSuggestions?: string[];
+  generativeUIElements?: GenerativeUIElement[];
   isEditing?: boolean;
   onEdit?: (newContent: string) => void;
   onCancelEdit?: () => void;
@@ -29,6 +64,7 @@ const RichMessage: React.FC<RichMessageProps> = ({
   reasoning,
   sources,
   followUpSuggestions,
+  generativeUIElements,
   isEditing = false,
   onEdit,
   onCancelEdit,
@@ -38,6 +74,7 @@ const RichMessage: React.FC<RichMessageProps> = ({
   const [showReasoning, setShowReasoning] = useState(false);
   const [editContent, setEditContent] = useState(content);
   const [isCitationExpanded, setIsCitationExpanded] = useState(false);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   const handleSaveEdit = () => {
     if (onMessageUpdate && messageIndex !== undefined) {
@@ -48,6 +85,28 @@ const RichMessage: React.FC<RichMessageProps> = ({
 
   const handleEdit = () => {
     onEdit?.(content);
+  };
+
+  const handleCopyCode = (code: string, index: number) => {
+    navigator.clipboard.writeText(code);
+    setCopiedIndex(index);
+    setTimeout(() => setCopiedIndex(null), 2000);
+  };
+
+  const handleDownloadCode = (code: string, language: string) => {
+    const extension =
+      languageToExtension[language.toLowerCase()] || "txt";
+    const filename = `code_${Date.now()}.${extension}`;
+    const element = document.createElement("a");
+    element.setAttribute(
+      "href",
+      "data:text/plain;charset=utf-8," + encodeURIComponent(code)
+    );
+    element.setAttribute("download", filename);
+    element.style.display = "none";
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
   };
 
   if (role === "user") {
@@ -103,6 +162,18 @@ const RichMessage: React.FC<RichMessageProps> = ({
           height={28}
         />
         <div className="flex-1 space-y-2">
+          {/* Generative UI Elements */}
+          {generativeUIElements && generativeUIElements.length > 0 && (
+            <div className="my-4 space-y-3 rounded-lg border border-blue-100 bg-blue-50 p-4">
+              <GenerativeUI
+                elements={generativeUIElements}
+                onAction={(action, payload) => {
+                  console.log("[v0] GenerativeUI action:", action, payload);
+                }}
+              />
+            </div>
+          )}
+
           {/* Main message content */}
           <div className="prose-sm max-w-5xl lg:prose lg:max-w-full">
             <ReactMarkdown
@@ -111,6 +182,8 @@ const RichMessage: React.FC<RichMessageProps> = ({
                   const { children, className, ...rest } = props;
                   const match = /language-(\w+)/.exec(className || "");
                   const isInline = !match;
+                  const codeString = String(children).replace(/\n$/, "");
+                  const codeBlockIndex = Math.random(); // Simple unique index
 
                   if (isInline) {
                     return (
@@ -124,19 +197,48 @@ const RichMessage: React.FC<RichMessageProps> = ({
                   }
 
                   return (
-                    <div className="not-prose my-4 overflow-hidden rounded-lg bg-gray-900">
-                      <div className="flex items-center justify-between bg-gray-800 px-4 py-2">
+                    <div className="not-prose my-4 overflow-hidden rounded-lg border border-gray-700 bg-gray-900">
+                      <div className="flex items-center justify-between bg-gray-800 px-4 py-3">
                         <span className="text-xs font-medium text-gray-300">
                           {match?.[1] || "code"}
                         </span>
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(String(children));
-                          }}
-                          className="text-xs text-gray-400 hover:text-white"
-                        >
-                          Copy
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() =>
+                              handleCopyCode(
+                                codeString,
+                                Number(codeBlockIndex)
+                              )
+                            }
+                            className="inline-flex items-center gap-1 rounded bg-gray-700 px-2 py-1 text-xs text-gray-300 transition-colors hover:bg-gray-600 hover:text-white"
+                            title="Copy code to clipboard"
+                          >
+                            {copiedIndex === Number(codeBlockIndex) ? (
+                              <>
+                                <CheckCircle2 size={14} />
+                                <span>Copied!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy size={14} />
+                                <span>Copy</span>
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={() =>
+                              handleDownloadCode(
+                                codeString,
+                                match?.[1] || "text"
+                              )
+                            }
+                            className="inline-flex items-center gap-1 rounded bg-gray-700 px-2 py-1 text-xs text-gray-300 transition-colors hover:bg-gray-600 hover:text-white"
+                            title="Download code file"
+                          >
+                            <Download size={14} />
+                            <span>Download</span>
+                          </button>
+                        </div>
                       </div>
                       <SyntaxHighlighter
                         language={match?.[1] || "text"}
@@ -145,9 +247,12 @@ const RichMessage: React.FC<RichMessageProps> = ({
                           margin: 0,
                           padding: "1rem",
                           fontSize: "0.875rem",
+                          lineHeight: "1.5",
                         }}
+                        wrapLines={true}
+                        wrapLongLines={true}
                       >
-                        {String(children).replace(/\n$/, "")}
+                        {codeString}
                       </SyntaxHighlighter>
                     </div>
                   );
